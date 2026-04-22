@@ -340,4 +340,4 @@ CREATE INDEX IF NOT EXISTS idx_order_restaurant_id_status ON "order" (restaurant
 - некоторые другие индексы нужны, но не описаны тут, потому что автоматически создаются, как часть unique или primary key ограничений
 
 # ADR
-Смотреть [adr.md](https://github.com/Tefaier/HighLoadHW/blob/main/docs/adr.md)
+Смотреть ![adr.md](./adr.md)
