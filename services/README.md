@@ -59,7 +59,7 @@
 
 **Idempotency key**  
 Создание заказа через `POST /order` защищено от дублей с помощью `key`: если запрос с тем же ключом повторяется, новый заказ не создаётся.  
-Ссылка: [`order_service/main.py`](../services/order_service/app/main.py#L241-L263)
+Ссылка: [`order_service/main.py`](../services/order_service/app/main.py#L248-L248)
 
 **Async queue processing**  
 Тяжёлая связность между сервисами вынесена в очередь RabbitMQ. Это позволяет не блокировать основной сценарий создания заказа и обрабатывать события асинхронно.  
