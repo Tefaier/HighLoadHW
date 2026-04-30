@@ -7,7 +7,7 @@ Base = declarative_base()
 
 
 def make_engine(database_url: str):
-    return create_engine(database_url, pool_pre_ping=True, future=True)
+    return create_engine(database_url, pool_pre_ping=True, future=True, pool_recycle=3600, pool_size=10, max_overflow=20, pool_timeout=30) # iter-1
 
 
 def make_session_factory(engine):

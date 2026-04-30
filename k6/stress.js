@@ -22,16 +22,20 @@ export const options = {
       // __ENV.PREALLOCATED_VUS ||
       preAllocatedVUs: Number("40"),
       // __ENV.MAX_VUS ||
-      maxVUs: Number("100"),
+      maxVUs: Number("300"),
       // __ENV.STAGE_1_RPS || 
       stages: [
-        { target: Number("30"), duration: __ENV.STAGE_1_DURATION || "1m" },
+        { target: Number("10"), duration: "1m" },
+        { target: Number("30"), duration: "1m" },
         { target: Number("50"), duration: __ENV.STAGE_1_DURATION || "1m" },
         { target: Number("70"), duration: __ENV.STAGE_2_DURATION || "1m" },
-        { target: Number("90"), duration: __ENV.STAGE_3_DURATION || "1m" },
-        { target: Number("110"), duration: __ENV.STAGE_4_DURATION || "1m" },
-        { target: Number("130"), duration: __ENV.STAGE_5_DURATION || "1m" },
-        { target: Number("150"), duration: __ENV.STAGE_6_DURATION || "1m" },
+        // { target: Number("90"), duration: __ENV.STAGE_3_DURATION || "1m" },
+        // { target: Number("110"), duration: __ENV.STAGE_4_DURATION || "1m" },
+        // { target: Number("130"), duration: __ENV.STAGE_5_DURATION || "1m" },
+        // { target: Number("150"), duration: __ENV.STAGE_6_DURATION || "1m" },
+        { target: Number("200"), duration: __ENV.STAGE_5_DURATION || "1m" },
+        { target: Number("300"), duration: __ENV.STAGE_6_DURATION || "1m" },
+        { target: Number("500"), duration: __ENV.STAGE_6_DURATION || "1m" },
       ],
       exec: "mixedFlow",
       tags: { test_type: "stress" },

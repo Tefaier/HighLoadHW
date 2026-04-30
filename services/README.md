@@ -55,23 +55,6 @@
 Обмен между сервисами завязан на события в RabbitMQ: заказ создаётся в `order-service`, публикуется событие `order.created`, а `tracking-service` его потребляет и создаёт запись у себя.  
 Ссылки: [`queue.py`](../services/common/queue.py#L13-L48), [`order_service/main.py`](../services/order_service/app/main.py#L241-L317), [`tracking_service/main.py`](../services/tracking_service/app/main.py#L118-L171)
 
-### Resilience patterns
-
-**Idempotency key**  
-Создание заказа через `POST /order` защищено от дублей с помощью `key`: если запрос с тем же ключом повторяется, новый заказ не создаётся.  
-Ссылка: [`order_service/main.py`](../services/order_service/app/main.py#L241-L263)
-
-**Async queue processing**  
-Тяжёлая связность между сервисами вынесена в очередь RabbitMQ. Это позволяет не блокировать основной сценарий создания заказа и обрабатывать события асинхронно.  
-Ссылки: [`queue.py`](../services/common/queue.py#L13-L48), [`order_service/main.py`](../services/order_service/app/main.py#L301-L317), [`tracking_service/main.py`](../services/tracking_service/app/main.py#L118-L156)
-
-**Reconnect / retry on queue consumer**  
-Если RabbitMQ или соединение временно недоступны, consumer переподключается в цикле. Это повышает устойчивость к кратковременным сбоям инфраструктуры.  
-Ссылки: [`order_service/main.py`](../services/order_service/app/main.py#L327-L352), [`tracking_service/main.py`](../services/tracking_service/app/main.py#L118-L156)
-
-**Health checks**  
-У каждого сервиса есть `GET /healthz`, чтобы быстро проверять его готовность и использовать это в smoke-test.  
-Ссылки: [`order_service/main.py`](../services/order_service/app/main.py#L127-L129), [`api_service/main.py`](../services/api_service/app/main.py#L38-L40), [`tracking_service/main.py`](../services/tracking_service/app/main.py#L43-L45)
 
 ### Resilience patterns
 
@@ -168,36 +151,34 @@ curl -X PATCH "http://localhost:8002/order/1" \
   -d '{"status":"confirmed"}'
 ```
 
-## Smoke test
+## Нагрузочные тесты
 
-Для полной проверки работоспособности используется скрипт `smoke_test.sh`.
+Для тестирования нагрузки используются три теста - smoke, stress, load
+
+Запуск как на семинаре:
+
+```bash
+cd k6
+chmod +x run.sh
+./run.sh smoke # (или stress, или load)
+```
+
+### Для полной проверки работоспособности используется скрипт `smoke.js`.
 
 Он делает следующее:
 
-1. Останавливает контейнеры
-2. Удаляет volumes
-3. Собирает и запускает стек заново
-4. Проверяет health-check'и
-5. Проверяет список ресторанов и меню
-6. Создаёт заказ
-7. Проверяет, что заказ попал в tracking-service
-8. Проверяет `GET /order/{id}`
-9. Меняет статус заказа
-10. Проверяет синхронизацию статуса
-11. Перезапускает стек и проверяет сохранность данных
+1. Проверяет список ресторанов и меню
+2. Создаёт заказ
+3. Проверяет, что заказ попал в tracking-service
+4. Проверяет `GET /order/{id}`
+5. Меняет статус заказа
+6. Проверяет синхронизацию статуса
+7. Перезапускает стек и проверяет сохранность данных
 
-Запуск:
+### stress.js
+максимизирующий сценарий c несколькими ступенями - разогрев и дальше плавное повышение нагрузки вплоть до отказа
 
-```bash
-chmod +x smoke_test.sh
-./smoke_test.sh
-```
+### load.js
+тест под длительную целевую нагрузку - разогрев и steady нагрузка 15 минут
 
-## Smoke test с полного сброса
-
-Если нужно вручную очистить данные перед запуском:
-
-```bash
-docker compose down -v
-./smoke_test.sh
-```
+### Метрики смотреть на http://127.0.0.1:5665/ui/?endpoint=/

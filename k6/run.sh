@@ -17,7 +17,7 @@ fi
 K6_WEB_DASHBOARD=true \
 K6_WEB_DASHBOARD_EXPORT="$REPORT" \
 k6 run --summary-export="$REPORT" "./${SCRIPT}.js"
-# pkill k6 || true
+pkill k6 || true
 
 echo
 echo "Отчёт сохранён: $REPORT"
