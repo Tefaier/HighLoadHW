@@ -41,7 +41,7 @@
 
 **Microservices**  
 Система разделена на три независимых сервиса: `order-service`, `api-service`, `tracking-service`. Это видно в `docker-compose.yml`, где каждый сервис запускается отдельным контейнером.  
-Ссылка: [`docker-compose.yml`](../docker-compose.yml#L48-L98)
+Ссылка: [`docker-compose.yml`](../docker-compose.yml#L58-L131)
 
 **Database per service**  
 Для разных частей системы используются отдельные базы данных: основной Postgres для каталога и заказов, отдельный Postgres для трекинга.  
