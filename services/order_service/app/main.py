@@ -349,7 +349,7 @@ def consume_status_changed() -> None:
             channel.start_consuming()
         except Exception as exc:
             logger.warning('status consumer reconnect in 2s: %s', exc)
-            time.sleep(2)
+            time.sleep(30)
 
 
 @app.post('/internal/order/status-sync')

@@ -22,7 +22,7 @@ class RabbitPublisher:
             connection = None
             try:
                 params = pika.URLParameters(self.amqp_url)
-                params.socket_timeout = 3
+                params.socket_timeout = 23
                 connection = pika.BlockingConnection(params)
                 channel = connection.channel()
                 channel.queue_declare(queue=routing_key, durable=True)

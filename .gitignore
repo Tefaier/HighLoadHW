@@ -10,6 +10,7 @@ __pycache__/
 .venv/
 venv/
 env/
+k6/reports
 
 # Env files
 .env

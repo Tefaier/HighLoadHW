@@ -2,6 +2,8 @@ services:
   postgres-main:
     image: postgres:16-alpine
     restart: unless-stopped
+    mem_limit: 3g
+    cpus: "1.0"
     environment:
       POSTGRES_DB: highload_main
       POSTGRES_USER: highload
@@ -10,7 +12,7 @@ services:
       - "5433:5432" # хост:контейнер
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U highload -d highload_main" ]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 10
     volumes:
@@ -19,6 +21,8 @@ services:
   postgres-tracking:
     image: postgres:16-alpine
     restart: unless-stopped
+    mem_limit: 1250m
+    cpus: "0.5"
     environment:
       POSTGRES_DB: highload_tracking
       POSTGRES_USER: highload
@@ -27,7 +31,7 @@ services:
       - "5434:5432" # другой порт хоста
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U highload -d highload_tracking" ]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 10
     volumes:
@@ -36,22 +40,30 @@ services:
   rabbitmq:
     image: rabbitmq:3-management-alpine
     restart: unless-stopped
+    mem_limit: 512m
+    cpus: "0.25"
+    environment:
+      RABBITMQ_DEFAULT_USER: highload
+      RABBITMQ_DEFAULT_PASS: highload
+      RABBITMQ_DEFAULT_VHOST: /
     ports:
       - "5672:5672"
       - "15672:15672"
     healthcheck:
       test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 10
 
   order-service:
-    build: .
+    build: .  
     restart: unless-stopped
+    mem_limit: 512m
+    cpus: "0.5"
     command: uvicorn services.order_service.app.main:app --host 0.0.0.0 --port 8000
     environment:
       DATABASE_URL: postgresql+psycopg2://highload:highload@postgres-main:5432/highload_main
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      RABBITMQ_URL: amqp://highload:highload@rabbitmq:5672/
       SERVICE_NAME: order-service
     depends_on:
       postgres-main:
@@ -60,14 +72,22 @@ services:
         condition: service_healthy
     ports:
       - "8000:8000"
+    healthcheck:
+      test: [ "CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=2).read()\"" ]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   api-service:
     build: .
     restart: unless-stopped
+    mem_limit: 512m
+    cpus: "0.5"
     command: uvicorn services.api_service.app.main:app --host 0.0.0.0 --port 8001
     environment:
       DATABASE_URL: postgresql+psycopg2://highload:highload@postgres-main:5432/highload_main
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      RABBITMQ_URL: amqp://highload:highload@rabbitmq:5672/
       SERVICE_NAME: api-service
     depends_on:
       postgres-main:
@@ -76,15 +96,23 @@ services:
         condition: service_healthy
     ports:
       - "8001:8001"
+    healthcheck:
+      test: [ "CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/healthz', timeout=2).read()\"" ]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   tracking-service:
     build: .
+    mem_limit: 512m
+    cpus: "0.5"
     restart: unless-stopped
     command: uvicorn services.tracking_service.app.main:app --host 0.0.0.0 --port 8002
     environment:
       DATABASE_URL: postgresql+psycopg2://highload:highload@postgres-tracking:5432/highload_tracking
       MAIN_DATABASE_URL: postgresql+psycopg2://highload:highload@postgres-main:5432/highload_main
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      RABBITMQ_URL: amqp://highload:highload@rabbitmq:5672/
       SERVICE_NAME: tracking-service
     depends_on:
       postgres-tracking:
@@ -95,6 +123,12 @@ services:
         condition: service_healthy
     ports:
       - "8002:8002"
+    healthcheck:
+      test: [ "CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8002/healthz', timeout=2).read()\"" ]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
 volumes:
   pg_main_data:

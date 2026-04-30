@@ -153,7 +153,7 @@ def consume_order_created() -> None:
             channel.start_consuming()
         except Exception as exc:
             logger.warning('consumer reconnect in 2s: %s', exc)
-            time.sleep(2)
+            time.sleep(30)
 
 
 def publish_status_changed(order_id: int, status_value: str) -> None:
