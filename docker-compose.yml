@@ -1,0 +1,101 @@
+services:
+  postgres-main:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: highload_main
+      POSTGRES_USER: highload
+      POSTGRES_PASSWORD: highload
+    ports:
+      - "5433:5432" # хост:контейнер
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U highload -d highload_main" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - pg_main_data:/var/lib/postgresql/data
+
+  postgres-tracking:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: highload_tracking
+      POSTGRES_USER: highload
+      POSTGRES_PASSWORD: highload
+    ports:
+      - "5434:5432" # другой порт хоста
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U highload -d highload_tracking" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - pg_tracking_data:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  order-service:
+    build: .
+    restart: unless-stopped
+    command: uvicorn services.order_service.app.main:app --host 0.0.0.0 --port 8000
+    environment:
+      DATABASE_URL: postgresql+psycopg2://highload:highload@postgres-main:5432/highload_main
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      SERVICE_NAME: order-service
+    depends_on:
+      postgres-main:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  api-service:
+    build: .
+    restart: unless-stopped
+    command: uvicorn services.api_service.app.main:app --host 0.0.0.0 --port 8001
+    environment:
+      DATABASE_URL: postgresql+psycopg2://highload:highload@postgres-main:5432/highload_main
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      SERVICE_NAME: api-service
+    depends_on:
+      postgres-main:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "8001:8001"
+
+  tracking-service:
+    build: .
+    restart: unless-stopped
+    command: uvicorn services.tracking_service.app.main:app --host 0.0.0.0 --port 8002
+    environment:
+      DATABASE_URL: postgresql+psycopg2://highload:highload@postgres-tracking:5432/highload_tracking
+      MAIN_DATABASE_URL: postgresql+psycopg2://highload:highload@postgres-main:5432/highload_main
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      SERVICE_NAME: tracking-service
+    depends_on:
+      postgres-tracking:
+        condition: service_healthy
+      postgres-main:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "8002:8002"
+
+volumes:
+  pg_main_data:
+  pg_tracking_data:
