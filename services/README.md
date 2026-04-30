@@ -89,7 +89,7 @@
 
 **Health checks**  
 У каждого сервиса есть `GET /healthz`, чтобы быстро проверять его готовность и использовать это в smoke-test.  
-Ссылки: [`order_service/main.py`](../services/order_service/app/main.py#L101-L103), [`tracking_service/main.py`](../services/tracking_service/app/main.py#L43-L45), [`api_service/main.py`](../services/api_service/app/main.py#L1-L1)
+Ссылки: [`order_service/main.py`](../services/order_service/app/main.py#L101-L103), [`tracking_service/main.py`](../services/tracking_service/app/main.py#L127-L129), [`api_service/main.py`](../services/api_service/app/main.py#L38-L40)
 
 
 ## Как запустить
