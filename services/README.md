@@ -41,37 +41,37 @@
 
 **Microservices**  
 Система разделена на три независимых сервиса: `order-service`, `api-service`, `tracking-service`. Это видно в `docker-compose.yml`, где каждый сервис запускается отдельным контейнером.  
-Ссылка: [`docker-compose.yml`](./docker-compose.yml#L48-L90)
+Ссылка: [`docker-compose.yml`](../docker-compose.yml#L48-L90)
 
 **Database per service**  
 У каждого домена свой контур данных: основной Postgres для каталога и заказов, отдельный Postgres для трекинга. Схема данных и модели заказов/ресторанов описаны отдельно от tracking-моделей.  
-Ссылки: [`docker-compose.yml`](./docker-compose.yml#L1-L34), [`db1_models.py`](./services/common/db1_models.py#L55-L135)
+Ссылки: [`docker-compose.yml`](../docker-compose.yml#L1-L34), [`db1_models.py`](../services/common/db1_models.py#L55-L135)
 
 **DTO / schema separation**  
 Внешние API-формы отделены от ORM-моделей через Pydantic-схемы. Это уменьшает связанность и делает контракт API явным.  
-Ссылка: [`schemas.py`](./services/order_service/app/schemas.py#L9-L83)
+Ссылка: [`schemas.py`](../services/order_service/app/schemas.py#L9-L83)
 
 **Event-driven communication**  
 Обмен между сервисами завязан на события в RabbitMQ: заказ создаётся в `order-service`, публикуется событие `order.created`, а `tracking-service` его потребляет и создает запись у себя.  
-Ссылки: [`queue.py`](./services/common/queue.py#L13-L48), [`order_service/main.py`](./services/order_service/app/main.py#L246-L262), [`tracking_service/main.py`](./services/tracking_service/app/main.py#L118-L156)
+Ссылки: [`queue.py`](../services/common/queue.py#L13-L48), [`order_service/main.py`](../services/order_service/app/main.py#L246-L262), [`tracking_service/main.py`](../services/tracking_service/app/main.py#L118-L156)
 
 ### Resilience patterns
 
 **Idempotency key**  
 Создание заказа защищено от дублей через `key` в `POST /order`: если запрос с тем же ключом повторяется, новый заказ не создаётся.  
-Ссылка: [`order_service/main.py`](./services/order_service/app/main.py#L186-L207)
+Ссылка: [`order_service/main.py`](../services/order_service/app/main.py#L186-L207)
 
 **Async queue processing**  
 Тяжёлые и связанные операции не выполняются синхронно в цепочке HTTP-вызовов. Вместо этого используется очередь RabbitMQ, которая разгружает основной сценарий создания заказа.  
-Ссылки: [`queue.py`](./services/common/queue.py#L17-L48), [`order_service/main.py`](./services/order_service/app/main.py#L246-L262)
+Ссылки: [`queue.py`](../services/common/queue.py#L17-L48), [`order_service/main.py`](../services/order_service/app/main.py#L246-L262)
 
 **Reconnect / retry on queue consumer**  
 Если RabbitMQ или соединение временно недоступны, consumer переподключается в цикле. Это делает сервис устойчивее к кратковременным сбоям инфраструктуры.  
-Ссылки: [`order_service/main.py`](./services/order_service/app/main.py#L274-L299), [`tracking_service/main.py`](./services/tracking_service/app/main.py#L118-L156)
+Ссылки: [`order_service/main.py`](../services/order_service/app/main.py#L274-L299), [`tracking_service/main.py`](../services/tracking_service/app/main.py#L118-L156)
 
 **Health checks**  
 У каждого сервиса есть `GET /healthz`, чтобы быстро проверять его готовность и использовать это в smoke-test.  
-Ссылки: [`order_service/main.py`](./services/order_service/app/main.py#L101-L103), [`tracking_service/main.py`](./services/tracking_service/app/main.py#L43-L45), [`api_service/main.py`](./services/api_service/app/main.py#L1-L1)
+Ссылки: [`order_service/main.py`](../services/order_service/app/main.py#L101-L103), [`tracking_service/main.py`](../services/tracking_service/app/main.py#L43-L45), [`api_service/main.py`](../services/api_service/app/main.py#L1-L1)
 
 
 ## Как запустить
