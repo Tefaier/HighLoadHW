@@ -73,24 +73,6 @@
 У каждого сервиса есть `GET /healthz`, чтобы быстро проверять его готовность и использовать это в smoke-test.  
 Ссылки: [`order_service/main.py`](../services/order_service/app/main.py#L127-L129), [`api_service/main.py`](../services/api_service/app/main.py#L38-L40), [`tracking_service/main.py`](../services/tracking_service/app/main.py#L43-L45)
 
-### Resilience patterns
-
-**Idempotency key**  
-Создание заказа защищено от дублей через `key` в `POST /order`: если запрос с тем же ключом повторяется, новый заказ не создаётся.  
-Ссылка: [`order_service/main.py`](../services/order_service/app/main.py#L186-L207)
-
-**Async queue processing**  
-Тяжёлые и связанные операции не выполняются синхронно в цепочке HTTP-вызовов. Вместо этого используется очередь RabbitMQ, которая разгружает основной сценарий создания заказа.  
-Ссылки: [`queue.py`](../services/common/queue.py#L17-L48), [`order_service/main.py`](../services/order_service/app/main.py#L246-L262)
-
-**Reconnect / retry on queue consumer**  
-Если RabbitMQ или соединение временно недоступны, consumer переподключается в цикле. Это делает сервис устойчивее к кратковременным сбоям инфраструктуры.  
-Ссылки: [`order_service/main.py`](../services/order_service/app/main.py#L274-L299), [`tracking_service/main.py`](../services/tracking_service/app/main.py#L118-L156)
-
-**Health checks**  
-У каждого сервиса есть `GET /healthz`, чтобы быстро проверять его готовность и использовать это в smoke-test.  
-Ссылки: [`order_service/main.py`](../services/order_service/app/main.py#L101-L103), [`tracking_service/main.py`](../services/tracking_service/app/main.py#L127-L129), [`api_service/main.py`](../services/api_service/app/main.py#L38-L40)
-
 
 ## Как запустить
 
