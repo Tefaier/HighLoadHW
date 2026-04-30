@@ -67,7 +67,7 @@
 
 **Reconnect / retry on queue consumer**  
 Если RabbitMQ или соединение временно недоступны, consumer переподключается в цикле. Это повышает устойчивость к кратковременным сбоям инфраструктуры.  
-Ссылки: [`order_service/main.py`](../services/order_service/app/main.py#L327-L352), [`tracking_service/main.py`](../services/tracking_service/app/main.py#L118-L156)
+Ссылки: [`order_service/main.py`](../services/order_service/app/main.py#L327-L352), [`tracking_service/main.py`](../services/tracking_service/app/main.py#L159-L159)
 
 **Health checks**  
 У каждого сервиса есть `GET /healthz`, чтобы быстро проверять его готовность и использовать это в smoke-test.  
