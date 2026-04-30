@@ -1,0 +1,137 @@
+version: "3.8"
+
+services:
+  # ==========================================================================
+  # DATABASES
+  # ==========================================================================
+  main_db:
+    image: docker.io/library/postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: main_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - main_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d main_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  tracking_db:
+    image: docker.io/library/postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tracking_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - tracking_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tracking_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================================================
+  # MESSAGE BROKER
+  # ==========================================================================
+  kafka:
+    image: docker.io/confluentinc/cp-kafka:7.5.0
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+
+  zookeeper:
+    image: docker.io/confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  # ==========================================================================
+  # SERVICES
+  # ==========================================================================
+  api_service:
+    build:
+      context: .
+      dockerfile: services/api_service/Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      MAIN_DATABASE_URL: postgresql://postgres:postgres@main_db:5432/main_db
+    depends_on:
+      main_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  order_service:
+    build:
+      context: .
+      dockerfile: services/order_service/Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      MAIN_DATABASE_URL: postgresql://postgres:postgres@main_db:5432/main_db
+      BROKER_URL: kafka://kafka:9092
+      BROKER_ENABLED: "false"
+    depends_on:
+      main_db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  tracking_service:
+    build:
+      context: .
+      dockerfile: services/tracking_service/Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      TRACKING_DATABASE_URL: postgresql://postgres:postgres@tracking_db:5432/tracking_db
+    depends_on:
+      tracking_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ==========================================================================
+  # DB INIT (one-shot init using python:slim with mounted code)
+  # ==========================================================================
+  db_init:
+    build:
+      context: .
+      dockerfile: services/db_init/Dockerfile
+    environment:
+      MAIN_DATABASE_URL: postgresql://postgres:postgres@main_db:5432/main_db
+      TRACKING_DATABASE_URL: postgresql://postgres:postgres@tracking_db:5432/tracking_db
+    depends_on:
+      main_db:
+        condition: service_healthy
+      tracking_db:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  main_db_data:
+  tracking_db_data:
