@@ -45,7 +45,7 @@
 
 **Database per service**  
 Для разных частей системы используются отдельные базы данных: основной Postgres для каталога и заказов, отдельный Postgres для трекинга.  
-Ссылки: [`docker-compose.yml`](../docker-compose.yml#L1-L34), [`db1_models.py`](../services/common/db1_models.py#L55-L143)
+Ссылки: [`docker-compose.yml`](../docker-compose.yml#L1-L39)
 
 **DTO / schema separation**  
 Внешние API-формы отделены от ORM-моделей через Pydantic-схемы. Это делает контракт API явным и уменьшает связанность кода.  
