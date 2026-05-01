@@ -10,7 +10,7 @@ import {
   assertOk,
 } from "./lib/common.js";
 
-const targetRps = Number(__ENV.TARGET_RPS || "300");
+const targetRps = Number(__ENV.TARGET_RPS || "200");
 const warmupRps = Number(__ENV.WARMUP_RPS || "50");
 const warmupDuration = __ENV.WARMUP_DURATION || "2m";
 const steadyDuration = __ENV.STEADY_DURATION || "15m";

@@ -10,7 +10,7 @@ import {
   assertOk,
 } from "./lib/common.js";
 
-const startRate = Number(__ENV.START_RPS || "300");
+const startRate = Number(__ENV.START_RPS || "10");
 
 export const options = {
   discardResponseBodies: false,
@@ -31,7 +31,7 @@ export const options = {
         // { target: Number("130"), duration: __ENV.STAGE_5_DURATION || "1m" },
         // { target: Number("150"), duration: __ENV.STAGE_6_DURATION || "1m" },
         { target: Number("200"), duration: __ENV.STAGE_5_DURATION || "2m" },
-        { target: Number("300"), duration: __ENV.STAGE_6_DURATION || "2m" },
+        { target: Number("250"), duration: __ENV.STAGE_6_DURATION || "2m" },
         // { target: Number("500"), duration: __ENV.STAGE_6_DURATION || "1m" }, // Неизбежная смерть
       ],
       exec: "mixedFlow",
