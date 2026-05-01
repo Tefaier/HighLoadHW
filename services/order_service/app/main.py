@@ -51,11 +51,12 @@ app = FastAPI(title='Order Service', version='0.1.0')
 
 
 def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    with SessionLocal() as db:
+        try:
+            yield db
+        except Exception as err:
+            db.rollback()
+            raise
 
 
 def _seed(db: Session) -> None:
@@ -154,36 +155,39 @@ def restaurant_list(
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    cuisine_filters, food_filters = _parse_query(query)
-    restaurants = list(db.scalars(select(Restaurant).order_by(Restaurant.id.asc())).all())
+    try:
+        cuisine_filters, food_filters = _parse_query(query)
+        restaurants = list(db.scalars(select(Restaurant).order_by(Restaurant.id.asc())).all())
 
-    def match(r: Restaurant) -> bool:
-        cuisine_values = [x.lower() for x in r.cuisine or []]
-        food_values = [x.lower() for x in r.food or []]
-        cuisine_ok = not cuisine_filters or any(c in cuisine_values for c in cuisine_filters)
-        food_ok = not food_filters or any(f in food_values for f in food_filters)
-        return cuisine_ok and food_ok
+        def match(r: Restaurant) -> bool:
+            cuisine_values = [x.lower() for x in r.cuisine or []]
+            food_values = [x.lower() for x in r.food or []]
+            cuisine_ok = not cuisine_filters or any(c in cuisine_values for c in cuisine_filters)
+            food_ok = not food_filters or any(f in food_values for f in food_filters)
+            return cuisine_ok and food_ok
 
-    filtered = [r for r in restaurants if match(r)]
-    start = (page - 1) * limit
-    items = filtered[start:start + limit]
-    return RestaurantListOut(
-        page=page,
-        limit=limit,
-        items_count=len(filtered),
-        items=[
-            RestaurantOut(
-                id=r.id,
-                name=r.name,
-                cuisine=r.cuisine,
-                food=r.food,
-                opening_hours=OpeningHours(open=r.open_hours_from, close=r.open_hours_to),
-                image_url=r.image_url,
-                rating=float(r.rating),
-            )
-            for r in items
-        ],
-    )
+        filtered = [r for r in restaurants if match(r)]
+        start = (page - 1) * limit
+        items = filtered[start:start + limit]
+        return RestaurantListOut(
+            page=page,
+            limit=limit,
+            items_count=len(filtered),
+            items=[
+                RestaurantOut(
+                    id=r.id,
+                    name=r.name,
+                    cuisine=r.cuisine,
+                    food=r.food,
+                    opening_hours=OpeningHours(open=r.open_hours_from, close=r.open_hours_to),
+                    image_url=r.image_url,
+                    rating=float(r.rating),
+                )
+                for r in items
+            ],
+        )
+    except SATimeoutError:
+        raise HTTPException(status_code=503, detail="Database is overloaded")
 
 
 @app.get('/restaurant/{restaurant_id}/food/list', response_model=FoodListOut)
@@ -194,14 +198,20 @@ def food_list(
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    stmt = select(Food).where(Food.restaurant_id == restaurant_id).order_by(Food.id.asc())
-    if query:
-        q = query.lower().strip()
-        stmt = stmt.where(or_(Food.name.ilike(f'%{q}%'), Food.description.ilike(f'%{q}%')))
-    foods = list(db.scalars(stmt).all())
-    start = (page - 1) * limit
-    items = foods[start:start + limit]
-    return FoodListOut(page=page, limit=limit, items_count=len(foods), items=items)
+    try:
+        stmt = select(Food).where(Food.restaurant_id == restaurant_id)
+
+        if query:
+            q = query.lower().strip()
+            stmt = stmt.where(or_(Food.name.ilike(f'%{q}%'), Food.description.ilike(f'%{q}%')))
+
+        foods = list(db.scalars(stmt).all())
+        start = (page - 1) * limit
+        items = foods[start:start + limit]
+        return FoodListOut(page=page, limit=limit, items_count=len(foods), items=items)
+
+    except SATimeoutError:
+        raise HTTPException(status_code=503, detail="Database is overloaded")
 
 
 def _body_hash(payload: OrderCreateIn) -> str:

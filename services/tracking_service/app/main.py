@@ -26,11 +26,12 @@ app = FastAPI(title='Tracking Service', version='0.1.0')
 
 
 def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    with SessionLocal() as db:
+        try:
+            yield db
+        except Exception as err:
+            db.rollback()
+            raise
 
 
 @app.on_event('startup')
