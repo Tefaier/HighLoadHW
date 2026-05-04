@@ -21,32 +21,32 @@
 ### Алерт №1 — Latency (SLI: p99 создания заказа)
 - **Метрика**: `http_request_duration_seconds{service="order-service", endpoint="/order", method="POST", quantile="0.99"}`
 - **Порог**: `> 500ms`
-- **Окно**: `за 5 минут`
-- **Задержка**: `5 минут`
+- **Окно**: `5m`
+- **Задержка**: `5m`
 - **Сервис**: `order service`
 - **Уровень тревоги**: Warning (далее Critical, если >800ms)
 
 ### Алерт №2 — Throughput (исчезли запросы)
 - **Метрика**: `rate(http_requests_total{service="order-service", endpoint="/order", method="POST", status=~"2.."}[1m])`
 - **Порог**: `< 10 RPS`
-- **Окно**: `за 3 минуты`
-- **Задержка**: `5 минут`
+- **Окно**: `3m`
+- **Задержка**: `5m`
 - **Сервис**: `order service`
 - **Уровень тревоги**: Critical
 
 ### Алерт №3 — Availability (5xx ошибки) (SLO: 99.95%)
 - **Метрика**: `rate(http_requests_total{service="order-service", endpoint="/order", method="POST", status=~"5.."}[1m]) / rate(http_requests_total{service="order-service", endpoint="/order", method="POST"}[1m]) * 100`
 - **Порог**: `> 0.05%`
-- **Окно**: `за 2 минуты` (чтобы видеть краткосрочные ошибки)
-- **Задержка**: `1 минут`
+- **Окно**: `3m`
+- **Задержка**: `1m`
 - **Сервис**: `order service`
 - **Уровень тревоги**: Critical
 
 ### Алерт №4 — Saturation (скопление заказов в статусе pending в БД1, метрику считает cron таска в одном инстансе)
-- **Метрика**: `rate(db_order_requests{service="order-service", count(order_status == 'pending')}[1m])`
-- **Порог**: `> 100000` (примерно 15 минут необработанных заказов)
-- **Окно**: `за 5 минуту`
-- **Задержка**: `1 минут`
+- **Метрика**: `max_over_time(db_order_requests{service="order-service", order_status='pending'}[5m])`
+- **Порог**: `> 100000` (примерно 15 минут заказов)
+- **Окно**: `5m`
+- **Задержка**: `1m`
 - **Почему**: Показывает, что tracking service не забирает записи из очереди или их не берут доставщики или не работает обратное обновление через очередь
 
 ---
