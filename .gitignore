@@ -11,6 +11,7 @@ __pycache__/
 venv/
 env/
 k6/reports
+add.md
 
 # Env files
 .env
