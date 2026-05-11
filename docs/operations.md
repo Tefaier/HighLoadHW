@@ -16,135 +16,158 @@
 - для всех случаев expand/contract метод обновление. Исключение, если добавляется например новая таблица или то, что не использовалось - тогда expant/contract не нужен.
 - для простых действий с метадатой таблиц обновление через обычные скрипты. Если обновление по времени растер пропорционально размеру таблицы, то по возможности через `pg_migrate` или через механизмы postgresql, которые позволяют избежать блокировки (например `create index concurrently` или `not valid`). Нужно будет учитывать необходимое место для работы `pg_migrate` на создание дубликата таблицы, если будет использоваться он.
 
-## 1.3 Observability (на основании ![requirements](./requirements.md))
+## 1.3 Observability (на основании [requirements](./requirements.md))
 
-### Алерт №1 — Latency (SLI: p99 создания заказа)
-- **Метрика**: `http_request_duration_seconds{service="order-service", endpoint="/order", method="POST", quantile="0.99"}`
-- **Порог**: `> 500ms`
-- **Окно**: `5m`
-- **Задержка**: `5m`
-- **Сервис**: `order service`
-- **Уровень тревоги**: Warning (далее Critical, если >800ms)
+### Алерты
 
-### Алерт №2 — Throughput (исчезли запросы)
-- **Метрика**: `rate(http_requests_total{service="order-service", endpoint="/order", method="POST", status=~"2.."}[1m])`
-- **Порог**: `< 10 RPS`
-- **Окно**: `3m`
-- **Задержка**: `5m`
-- **Сервис**: `order service`
-- **Уровень тревоги**: Critical
-
-### Алерт №3 — Availability (5xx ошибки) (SLO: 99.95%)
-- **Метрика**: `rate(http_requests_total{service="order-service", endpoint="/order", method="POST", status=~"5.."}[1m]) / rate(http_requests_total{service="order-service", endpoint="/order", method="POST"}[1m]) * 100`
-- **Порог**: `> 0.05%`
-- **Окно**: `3m`
-- **Задержка**: `1m`
-- **Сервис**: `order service`
-- **Уровень тревоги**: Critical
-
-### Алерт №4 — Saturation (скопление заказов в статусе pending в БД1, метрику считает cron таска в одном инстансе)
-- **Метрика**: `max_over_time(db_order_requests{service="order-service", order_status='pending'}[5m])`
-- **Порог**: `> 100000` (примерно 15 минут заказов)
-- **Окно**: `5m`
-- **Задержка**: `1m`
-- **Почему**: Показывает, что tracking service не забирает записи из очереди или их не берут доставщики или не работает обратное обновление через очередь
+| Сигнал     | Метрика                                                                                                                                                                   | Порог                                         | На что                   |
+|------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------|--------------------------|
+| Latency    | `http_request_duration_seconds{service="order-service", endpoint="/order", method="POST", quantile="0.99"}`                                                               | > 500ms за 5m (Warning → Critical если >800ms) | order service            |
+| Traffic    | `rate(http_requests_total{service="order-service", endpoint="/order", method="POST", status=~"2.."}[1m])`                                                                | < 10 RPS за 3m                                | order service            |
+| Errors     | `rate(http_requests_total{service="order-service", endpoint="/order", method="POST", status=~"5.."}[1m]) / rate(http_requests_total{service="order-service", endpoint="/order", method="POST"}[1m]) * 100` | > 0.05% за 3m                                 | order service            |
+| Saturation | `max_over_time(db_order_requests{service="order-service", order_status='pending'}[5m])`                                                                                   | > 100000 за 5m                                | order service / БД1 (очередь pending) |
 
 ---
 
-### Уровень 1: Overview Dashboard  
-- **Traffic**  
-  - RPS по каждому сервису — отдельно чтение / запись  
+### Уровень 1: Overview Dashboard (Golden Signals)
 
-- **Errors**  
-  - % 4xx и 5xx по каждому сервису (order / api / tracking)
+#### 1. Traffic
+- **RPS по каждому сервису**  
+  - чтение (GET/HEAD)  
+  - запись (POST/PUT/PATCH/DELETE)
 
-- **Latency**  
-  - p99 order service (POST /order) 
-  - p95 order service (GET /restaurant/list)
-  - p95 order service (GET /restaurant/*/food/list)
-  - p95 api service (PATCH /restaurant)  
-  - p95 tracking service (PATCH /order/{id})  
+#### 2. Errors
+- **% 4xx и 5xx или других ошибок по каждому сервису и компоненту**
+  - order  
+  - order-db1 calls
+  - order-payment calls
+  - order-queue calls
+  - api  
+  - api-s3 calls
+  - api-db1 calls
+  - tracking
+  - tracking-notification calls
+  - tracking-queue calls
+  - tracking-db2 calls
 
-- **Saturation**  
-  - Размер очереди message broker (RabbitMQ)  
-  - Количество заказов в БД2 со статусом pending / confirmed  
-  - CPU / Memory usage (в среднем по сервисам)
-  - количество инстансов каждого сервиса
+#### 3. Latency
+- **order service**  
+  - p99 (POST /order)  
+  - p95 (GET /restaurant/list)  
+  - p95 (GET /restaurant/*/food/list)  
+- **api service**  
+  - p95 (PATCH /restaurant)  
+- **tracking service**  
+  - p95 (PATCH /order/{id})
+
+#### 4. Saturation
+- Размер очереди message broker (RabbitMQ)  
+- Количество заказов в **БД2** со статусом `pending` / `confirmed`  
+- CPU / Memory usage (максимальное среди инстансов каждого сервиса)  
+- Количество инстансов каждого сервиса
 
 ---
 
-### Уровень 2: Service Dashboard 
+### Уровень 2: Service Dashboard
+
 #### 2.1 Order Service Dashboard
-- **Endpoints**  
-  - POST /order — RPS, p99 latency, успех/ошибки (по кодам 2**/4**/5**)  
-  - GET /restaurant/list — RPS, p95 latency, errors
-  - GET /restaurant/*/food/list — RPS, p95 latency, errors
 
-- **Database (БД1)**  
-  - Среднее время выполнения запросов к БД
-  - Количество активных транзакций  
-  - Количество записей order по разным status 
-  - Idempotency key overlap — кол-во вызовов создания заказа с известным ключом
+#### Endpoints
+| Endpoint | Метрики |
+|----------|---------|
+| POST /order | RPS, p99 latency, успех/ошибки по кодам 2**/4**/5** |
+| GET /restaurant/list | RPS, p95 latency, errors |
+| GET /restaurant/*/food/list | RPS, p95 latency, errors |
 
-- **Message Broker**  
-  - RPS вызовов
-  - p95 времени ответа 
+#### Database (БД1)
+- Среднее время выполнения запросов к БД  
+- Количество активных транзакций  
+- Количество записей `order` по разным `status`  
+- Idempotency key overlap — кол-во вызовов создания заказа с известным ключом  
+
+#### Message Broker
+- RPS вызовов (публикация/потребление)  
+- p95 времени ответа  
+
+---
 
 #### 2.2 API Service Dashboard
-- **Endpoints**  
-  - POST /admin/restaurants — RPS, p95 latency, errors  
-  - PATCH /admin/restaurants — RPS, p95 latency, errors  
-  - POST /admin/foods — RPS, p95 latency, errors  
-  - PATCH /admin/foods — RPS, p95 latency, errors  
-  - POST /courier — rps создания курьеров
 
-- **S3**
-  - общая скорость записи в s3
+#### Endpoints
+| Endpoint | Метрики |
+|----------|---------|
+| POST /admin/restaurants | RPS, p95 latency, errors |
+| PATCH /admin/restaurants | RPS, p95 latency, errors |
+| POST /admin/foods | RPS, p95 latency, errors |
+| PATCH /admin/foods | RPS, p95 latency, errors |
+| POST /courier | RPS создания курьеров |
 
-#### 2.3 Tracking Service Dashboard
-- **Endpoints**  
-  - GET /orders — RPS, p99 latency
-  - PATCH /order/*?status=… — RPS, p99 latency, errors
+#### S3
+- Общая скорость записи в S3 (байт/с)
+- Количество ошибок доступа к S3 с разделением по типу ошибки
 
-- **Database (БД2)**
-  - Количество заказов по статусам (pending → delivery → finished)  
+---
 
-- **Message Broker**  
-  - Max разницы времени между временем создания заказа и временем обработки сообщения о создании заказа
+### 2.3 Tracking Service Dashboard
+
+#### Endpoints
+| Endpoint | Метрики |
+|----------|---------|
+| GET /orders | RPS, p99 latency |
+| PATCH /order/*?status=… | RPS, p99 latency, errors |
+
+#### Database (БД2)
+- Количество заказов по статусам: `pending`, `delivery`, `finished`  
+
+#### Message Broker
+- **Max разницы времени** между временем создания заказа и временем обработки сообщения о создании заказа
+- Количество таймаутов при записи
 
 ---
 
 ### Уровень 3: Diagnostic Dashboard
-- **Трейсы**
-  - Фильтр по trace_id
 
-- **Логи**  
-  - Поиск по trace_id, rid, status, источник (service/nginx/db1/db2/rabbitmq)
+#### 1. Трейсы
+- Фильтр по `trace_id`
 
-- **Метрики**  
-  - threads, RAM usage, CPU usage в каждом сервисе и инстансе
-  - RPS, p99, errors на запросы проведения оплаты
+#### 2. Логи
+- Поиск по:
+  - `trace_id`
+  - `rid` (request id)
+  - `status` (HTTP status / log level)
+  - `источник` (service / nginx / db1 / db2 / rabbitmq)
 
-- **Database**
-  - Количество ошибок в БД1 и БД2
-  - Время WAIT ивентов в БД1 и БД2
-  - Свободное место в БД1 и БД2
+#### 3. Метрики (ресурсы и платежи)
+- **На уровне сервиса и инстанса**  
+  - threads  
+  - RAM usage  
+  - CPU usage  
+- **Платёжный шлюз**  
+  - RPS на запросы проведения оплаты  
+  - p99 latency  
+  - errors (4xx, 5xx)
 
-- **Broker - RabbitMQ**  
-  - RabbitMQ: количество неподтвержденных сообщений  
-  - Количество упавших нод
+#### 4. Database (БД1 и БД2)
+- Количество ошибок в БД1 и БД2
+- Время **WAIT** ивентов в БД1 и БД2  
+- Свободное место в БД1 и БД2 в процентах
 
-- **S3**:
-  - Свободное место в S3 bucket
+#### 5. Broker — RabbitMQ
+- Количество неподтверждённых сообщений
+- Количество упавших нод
+
+#### 6. S3
+- Свободное место в S3 bucket в процентах
+- Количество неудачных операций записи
 
 ---
 
 ### Логи
 
-Json формат логов.
+Json формат логов. Запись в stdout, откуда уже отправляются в хранилище (loki). Проще в реализации.
 
 Обязательный поля:
-- time (YYYY-MM-DDTHH:mm:ss.sssZ) (UTC+0)
+- time (YYYY-MM-DDTHH:mm:ss.sssZ) (все в UTC+0)
 - service_name
 - host (service, сервер, номер)
 - rid
@@ -153,7 +176,7 @@ Json формат логов.
 
 Необязательные поля:
 - trace_id (по возможности всегда)
-- meta (все остальное в формате json)
+- meta (все остальное в формате объекта json)
 
 Для nginx:
 - host
@@ -162,9 +185,11 @@ Json формат логов.
 - status
 - request
 
-Логируем (экспортируем) абсолютно все, что залогированно в коде (и в коде залогированы начало и конец http запросов, но без headers и body). Для библиотек логи ограничены: только логи запросов и ошибок к бд, rabbitmq. Отдельно nginx где логируем на моменте ответа клиенту или завершения соединения (когда клиент оборвал соединение).
+Для библиотек логи ограничены: только логи запросов и ошибок к бд, rabbitmq. Отдельно nginx где логируем на моменте ответа клиенту или завершения соединения (когда клиент оборвал соединение). Дополнительно логируем все внешние запросы (uri, time, error). Логируем начало, окончание, ошибки cron задач. Логируем запись и чтение из очереди (только (не) успех)
 
 Body запросов не логируем, потому что они могут быть бесконтрольно большими. Headers запросов не логируем, потому что там часто передаются чуствительные данные и их впринципе может быть много.
+
+Если лог принадлежит ошибке, то она с `stacktrace` идет в `message` в конце.
 
 # 2 Доступность
 
